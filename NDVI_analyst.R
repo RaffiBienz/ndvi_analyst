@@ -6,7 +6,6 @@
 library(raster)
 library(rgdal)
 library(rgeos)
-library(lidR)
 
 setwd("C:/Auswertungen/Trockenheit_2019/")
 rasterOptions(tmpdir= "C:/Auswertungen/Trockenheit_2019/temp/",todisk=TRUE, progress="text")#progress bar wird angegeben
