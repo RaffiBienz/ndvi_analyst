@@ -21,21 +21,15 @@ swissEO = TRUE # Set to TRUE, if you use swissEO S2-SR data, set to FALSE, if yo
 #### Set paths and global variables ####
 ######################################################################################################################################################################################
 time1 <- "08082025"
-time2 <- "22072026"
+time2 <- "13082026"
 
 threshold <- -0.08 # Which NDVI reduction is regarded as a change
 
 # paths to Sentinel-2 data
-if (swissEO) {
-  path_time1 <- "data/swissEO/swissEO-S2-SR-08082025.tif"
-  path_time2 <- "data/swissEO/swissEO-S2-SR-22072026.tif"
-} else {
-  path_time1_b4 <- "data/copernicus/T32TMT_20200807T102559_B04_10m.jp2"
-  path_time1_b8 <- "data/copernicus/T32TMT_20200807T102559_B08_10m.jp2"
-  path_time2_b4 <- "data/copernicus/T32TMT_20210812T102559_B04_10m.jp2"
-  path_time2_b8 <- "data/copernicus/T32TMT_20210812T102559_B08_10m.jp2"
-}
-
+path_time1_b4 <- "data/swissEO/swisseo_20250808_b04.tif"
+path_time1_b8 <- "data/swissEO/swisseo_20250808_b08.tif"
+path_time2_b4 <- "data/swissEO/swisseo_20260813_b04.tif"
+path_time2_b8 <- "data/swissEO/swisseo_20260813_b08.tif"
 
 # name of forest delineation shapefile
 path_fd <- "data/wa.shp"
@@ -64,28 +58,35 @@ if (remove_clouds){
 }
 
 # Import of Sentinel-2 data
-if (swissEO){
-  rgbi_time1 <- rast(path_time1)
-  rgbi_time2 <- rast(path_time2)
-} else {
-  b4_time1 <- rast(path_time1_b4)
-  b8_time1 <- rast(path_time1_b8)
-  b4_time2 <- rast(path_time2_b4)
-  b8_time2 <- rast(path_time2_b8)
-}
+b4_time1 <- rast(path_time1_b4)
+b8_time1 <- rast(path_time1_b8)
+b4_time2 <- rast(path_time2_b4)
+b8_time2 <- rast(path_time2_b8)
 
 
 ######################################################################################################################################################################################
 #### Calculation ####
 ######################################################################################################################################################################################
-# NDVI calculation
+# Scaling of Reflectance Values
+# According to https://www.swisstopo.admin.ch/de/satellitenbilder-swisseo-s2-sr the swissEO values need to be scaled
 if (swissEO){
-  ndvi_time1 <- (rgbi_time1[[4]]-rgbi_time1[[1]])/(rgbi_time1[[4]]+rgbi_time1[[1]])
-  ndvi_time2 <- (rgbi_time2[[4]]-rgbi_time2[[1]])/(rgbi_time2[[4]]+rgbi_time2[[1]])
-} else {
-  ndvi_time1 <- (b8_time1-b4_time1)/(b8_time1+b4_time1)
-  ndvi_time2 <- (b8_time2-b4_time2)/(b8_time2+b4_time2)
+  b4_time1 <- (b4_time1 * 0.0001) - 0.1
+  b4_time1[b4_time1<0] <- 0
+  
+  b8_time1 <- (b8_time1 * 0.0001) - 0.1
+  b8_time1[b8_time1<0] <- 0
+  
+  b4_time2 <- (b4_time2 * 0.0001) - 0.1
+  b4_time2[b4_time2<0] <- 0
+  
+  b8_time2 <- (b8_time2 * 0.0001) - 0.1
+  b8_time2[b8_time2<0] <- 0
 }
+
+
+# NDVI calculation
+ndvi_time1 <- (b8_time1-b4_time1)/(b8_time1+b4_time1)
+ndvi_time2 <- (b8_time2-b4_time2)/(b8_time2+b4_time2)
 
 # NDVI difference
 ndvi_diff <- ndvi_time2 - ndvi_time1
@@ -104,7 +105,7 @@ ndvi_diff_kt <- crop(ndvi_diff,kt)
 
 # Clip to forest delineation
 if (!file.exists("wd/wa_ras.tif")){
-  wa_ras <- rasterize(wa_agg,ndvi_diff_kt,mask=T)
+  wa_ras <- rasterize(wa_agg,ndvi_diff_kt)
   wa_ras[!is.na(wa_ras[])] <- 1
   writeRaster(wa_ras,"wd/wa_ras.tif")
 }
@@ -156,6 +157,5 @@ ndvi_focal <- rast(paste0("results/ndvi_diff_binary_", time1,"_", time2,".tif"))
 print("Results with edge effects removal:")
 print(paste0("Affected forest area in ha: ", round(length(which(ndvi_focal[]==1))/100,2))) # Affected forest area in ha with threshold
 print(paste0("Affected forest area in %: ", round(length(which(ndvi_focal[]==1))/length(which(!is.na(ndvi_focal[])))*100,2))) # Affected forest area in % with threshold
-
 
 
